@@ -12,33 +12,71 @@ import PageContainer from '../../../../modernize-dashboard/src/components/contai
 
 const SettingsMain = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [companySettings, setCompanySettings] = useState({
-    name: 'WebMonk Tech Solutions',
-    email: 'info@webmonk.com',
-    phone: '+91-9876543210',
-    address: '123 Tech Park, Bangalore, India',
-    website: 'https://webmonk.com',
-    currency: 'INR',
-    timezone: 'Asia/Kolkata',
-    taxNumber: 'GST123456789',
-    logo: ''
+  const [companySettings, setCompanySettings] = useState(() => {
+    const saved = localStorage.getItem('companySettings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      name: 'WebMonk Tech Solutions',
+      email: 'info@webmonk.com',
+      phone: '+91-9876543210',
+      address: '123 Tech Park, Bangalore, India',
+      website: 'https://webmonk.com',
+      currency: 'INR',
+      timezone: 'Asia/Kolkata',
+      taxNumber: 'GST123456789',
+      logo: ''
+    };
   });
 
-  const [moduleSettings, setModuleSettings] = useState({
-    crm: true,
-    inventory: true,
-    sales: true,
-    accounting: true,
-    hr: true,
-    projects: true,
-    billing: true,
-    analytics: true,
-    tasks: true,
-    auth: true,
-    notifications: true,
-    broadcast: true,
-    marketplace: true,
-    settings: true
+  const [moduleSettings, setModuleSettings] = useState(() => {
+    const saved = localStorage.getItem('enabledModules');
+    if (saved) {
+      const enabledModules = JSON.parse(saved);
+      return {
+        crm: enabledModules.includes('crm'),
+        inventory: enabledModules.includes('inventory'),
+        sales: enabledModules.includes('sales'),
+        accounting: enabledModules.includes('accounting'),
+        hr: enabledModules.includes('hr'),
+        projects: enabledModules.includes('projects'),
+        billing: enabledModules.includes('billing'),
+        analytics: enabledModules.includes('analytics'),
+        tasks: enabledModules.includes('tasks'),
+        auth: enabledModules.includes('auth'),
+        notifications: enabledModules.includes('notifications'),
+        broadcast: enabledModules.includes('broadcast'),
+        marketplace: enabledModules.includes('marketplace'),
+        settings: true, // Always keep settings enabled
+        ecommerce: enabledModules.includes('ecommerce'),
+        booking: enabledModules.includes('booking'),
+        'live-tracking': enabledModules.includes('live-tracking'),
+        'geofencing-attendance': enabledModules.includes('geofencing-attendance'),
+        'mobile-users': enabledModules.includes('mobile-users')
+      };
+    }
+    return {
+      crm: true,
+      inventory: true,
+      sales: true,
+      accounting: true,
+      hr: true,
+      projects: true,
+      billing: true,
+      analytics: true,
+      tasks: true,
+      auth: true,
+      notifications: true,
+      broadcast: true,
+      marketplace: true,
+      settings: true,
+      ecommerce: true,
+      booking: true,
+      'live-tracking': true,
+      'geofencing-attendance': true,
+      'mobile-users': true
+    };
   });
 
   const [systemSettings, setSystemSettings] = useState({
@@ -84,11 +122,35 @@ const SettingsMain = () => {
   ]);
 
   const handleCompanyChange = (field, value) => {
-    setCompanySettings(prev => ({ ...prev, [field]: value }));
+    const newSettings = { ...companySettings, [field]: value };
+    setCompanySettings(newSettings);
+    localStorage.setItem('companySettings', JSON.stringify(newSettings));
+    
+    // Dispatch custom event to update logo
+    window.dispatchEvent(new CustomEvent('companySettingsUpdated'));
+  };
+
+  const handleLogoUpload = (file) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        handleCompanyChange('logo', e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleModuleToggle = (module) => {
-    setModuleSettings(prev => ({ ...prev, [module]: !prev[module] }));
+    const newSettings = { ...moduleSettings, [module]: !moduleSettings[module] };
+    setModuleSettings(newSettings);
+    
+    // Update localStorage
+    const enabledModules = Object.keys(newSettings).filter(key => newSettings[key]);
+    localStorage.setItem('enabledModules', JSON.stringify(enabledModules));
+    
+    // Show confirmation
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleSystemChange = (field, value) => {
@@ -216,6 +278,32 @@ const SettingsMain = () => {
           margin="normal"
         />
       </Grid>
+      <Grid item xs={12}>
+        <Typography variant="h6" mb={2}>Company Logo</Typography>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Button variant="outlined" component="label">
+            Upload Logo
+            <input
+              type="file"
+              hidden
+              accept="image/*"
+              onChange={(e) => handleLogoUpload(e.target.files[0])}
+            />
+          </Button>
+          {companySettings.logo && (
+            <Box>
+              <img 
+                src={companySettings.logo} 
+                alt="Company Logo" 
+                style={{ height: '50px', maxWidth: '150px', objectFit: 'contain' }}
+              />
+              <Button size="small" color="error" onClick={() => handleCompanyChange('logo', '')}>
+                Remove
+              </Button>
+            </Box>
+          )}
+        </Box>
+      </Grid>
     </Grid>
   );
 
@@ -223,9 +311,14 @@ const SettingsMain = () => {
     <Grid container spacing={3}>
       <Grid item xs={12}>
         <Typography variant="h6" mb={2}>Module Management</Typography>
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          Enable or disable business modules for your organization. Disabled modules won't appear in the sidebar.
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="body2" color="text.secondary">
+            Enable or disable business modules for your organization. Disabled modules won't appear in the sidebar.
+          </Typography>
+          <Button variant="outlined" size="small" onClick={() => window.location.reload()}>
+            Apply Changes
+          </Button>
+        </Box>
       </Grid>
       {Object.entries(moduleSettings).map(([module, enabled]) => (
         <Grid item xs={12} md={6} lg={4} key={module}>
@@ -241,6 +334,7 @@ const SettingsMain = () => {
                       checked={enabled} 
                       onChange={() => handleModuleToggle(module)}
                       color="primary"
+                      disabled={module === 'settings'}
                     />
                   }
                   label=""
@@ -261,6 +355,11 @@ const SettingsMain = () => {
                 {module === 'broadcast' && 'Message Broadcasting'}
                 {module === 'marketplace' && 'Module Marketplace'}
                 {module === 'settings' && 'System Configuration'}
+                {module === 'ecommerce' && 'Online Store Management'}
+                {module === 'booking' && 'Appointment & Service Booking'}
+                {module === 'live-tracking' && 'Real-time Vehicle Tracking'}
+                {module === 'geofencing-attendance' && 'Location-based Attendance'}
+                {module === 'mobile-users' && 'Mobile User Management'}
               </Typography>
               <Chip 
                 label={enabled ? 'Enabled' : 'Disabled'} 
